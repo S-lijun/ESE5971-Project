@@ -105,7 +105,7 @@ def process_battery(mat_path):
 # =============================
 def main():
     base_dir = r"C:\Users\lijun\Downloads\ESE5971-Project\5_Battery_Data_Set"
-    output_dir = r"C:\Users\lijun\Downloads\ESE5971-Project\output"
+    output_dir = r"C:\Users\lijun\Downloads\ESE5971-Project\Data"
     os.makedirs(output_dir, exist_ok=True)
 
     all_dfs = []
