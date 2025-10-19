@@ -10,9 +10,6 @@ STAT_FUNCS = {
     "avg": np.mean,
     "min": np.min,
     "max": np.max,
-    # Reserved for future extensions:
-    # "median": np.median,
-    # "std": np.std,
 }
 
 def extract_stats(data, prefix):
@@ -32,14 +29,14 @@ def extract_stats(data, prefix):
 def process_battery(mat_path):
     """
     Process one .mat file:
-    - Automatically detect charge/discharge cycles
-    - Pair them in sequence (the i-th charge matches the i-th discharge)
-    - Compute avg/min/max features
+    - Detect charge/discharge cycles
+    - Compute avg/min/max for measured features
+    - Add duration_s for both charge and discharge
+    - Skip ideal/control features (Voltage_charge, Voltage_load, etc.)
     """
     mat = scipy.io.loadmat(mat_path)
     battery_name = os.path.basename(mat_path).split(".")[0]
 
-    # Automatically detect main key
     main_key = next((k for k in mat.keys() if not k.startswith("__")), None)
     if main_key is None or "cycle" not in mat[main_key][0, 0].dtype.names:
         print(f"{battery_name}: No valid 'cycle' structure found, skipped.")
@@ -64,18 +61,18 @@ def process_battery(mat_path):
         features.update(extract_stats(current, f"{prefix}_current"))
         features.update(extract_stats(temp, f"{prefix}_temp"))
 
-        # Extra labels only for discharge
-        if ctype == "discharge":
-            if "Time" in data.dtype.names and len(data["Time"][0]) > 0:
-                features["discharge_duration_s"] = data["Time"][0][-1]
-            else:
-                features["discharge_duration_s"] = np.nan
+        # ===== Duration =====
+        if "Time" in data.dtype.names and len(data["Time"][0]) > 0:
+            features[f"{prefix}_duration_s"] = data["Time"][0][-1]
+        else:
+            features[f"{prefix}_duration_s"] = np.nan
 
+        # ===== Capacity only for discharge =====
+        if ctype == "discharge":
             if "Capacity" in data.dtype.names and len(data["Capacity"][0]) > 0:
                 features["capacity_Ah"] = data["Capacity"][0][-1]
             else:
                 features["capacity_Ah"] = np.nan
-
             rows_discharge.append(features)
         else:
             rows_charge.append(features)
@@ -101,7 +98,7 @@ def process_battery(mat_path):
 
 
 # =============================
-# Main function: Process all files in batch
+# Main function
 # =============================
 def main():
     base_dir = r"C:\Users\lijun\Downloads\ESE5971-Project\5_Battery_Data_Set"
@@ -120,24 +117,21 @@ def main():
                     all_dfs.append(df)
 
     if not all_dfs:
-        print(" No DataFrames generated. Please check data structure or pairing logic.")
+        print("No DataFrames generated. Please check data structure or pairing logic.")
         return
 
     final_df = pd.concat(all_dfs, ignore_index=True)
 
-    # Add Remaining Useful Life (RUL)
+    # Compute RUL (Remaining Useful Life)
     final_df["RUL"] = final_df.groupby("battery")["cycle"].transform(lambda x: x.max() - x)
 
     out_path = os.path.join(output_dir, "battery_cycles_summary.csv")
     final_df.to_csv(out_path, index=False)
-    print(f"\n All processing complete! Output file: {out_path}")
-    print(f" Total rows: {len(final_df)}, Total columns: {len(final_df.columns)}\n")
+    print(f"\nAll processing complete! Output file: {out_path}")
+    print(f"Total rows: {len(final_df)}, Total columns: {len(final_df.columns)}\n")
     print("Preview:")
     print(final_df.head())
 
 
-# =============================
-# Entry point
-# =============================
 if __name__ == "__main__":
     main()
