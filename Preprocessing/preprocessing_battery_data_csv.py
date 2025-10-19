@@ -111,7 +111,7 @@ def main():
         for file in files:
             if file.endswith(".mat"):
                 path = os.path.join(root, file)
-                print(f"Processing {path} ...")
+                #print(f"Processing {path} ...")
                 df = process_battery(path)
                 if not df.empty:
                     all_dfs.append(df)
